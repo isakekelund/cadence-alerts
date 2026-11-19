@@ -4,6 +4,7 @@
 //   POST ?action=status       { endpoint } -> { known, approved, code, keyOk }
 //   POST ?action=unsubscribe  { endpoint }
 //   POST ?action=test         { endpoint } -> sends a test notification to that phone (approved phones only)
+//   POST ?action=enqueue      header x-enqueue-token, { key, title, body, url? } -> adds a row to push_outbox (used by the Mac mini)
 //   POST (no action)          header x-cron-secret: sends due rows from push_outbox (run by pg_cron)
 // New phones start unapproved, so nobody who finds the page can read Isak's notifications.
 import webpush from "npm:web-push@3.6.7";
@@ -39,7 +40,7 @@ async function getKeys() {
     ({ data, error } = await db.from("push_keys").select("*").eq("id", 1).single());
     if (error) throw error;
   }
-  return data as { public_key: string; private_key: string; cron_secret: string };
+  return data as { public_key: string; private_key: string; cron_secret: string; enqueue_token: string };
 }
 
 async function codeFor(endpoint: string) {
@@ -155,6 +156,21 @@ Deno.serve(async (req) => {
       if (!claimed || !claimed.length) return json(req, { error: "wait a minute" }, 429);
       const r = await send(k, s as Sub, { title: "Cadence", body: "Test notification. Notifications are on.", url: APP_URL, tag: "test" });
       return json(req, { result: r }, r === "sent" ? 200 : 502);
+    }
+
+    if (action === "enqueue") {
+      const k = await getKeys();
+      if (!k.enqueue_token || req.headers.get("x-enqueue-token") !== k.enqueue_token) return json(req, { error: "forbidden" }, 403);
+      const str = (v: unknown, n: number) => (typeof v === "string" ? v.trim().slice(0, n) : "");
+      const key = str(body.key, 100), title = str(body.title, 80), text = str(body.body, 240);
+      const url = typeof body.url === "string" && /^https:\/\//.test(body.url) ? body.url.slice(0, 500) : null;
+      if (!/^[a-z0-9][a-z0-9:._-]*$/i.test(key) || !title) return json(req, { error: "need key and title" }, 400);
+      const { data, error } = await db.from("push_outbox")
+        .upsert({ key, title, body: text, url }, { onConflict: "key", ignoreDuplicates: true }).select();
+      if (error) throw error;
+      // Send right away instead of waiting for the next cron run; push_sent still stops doubles.
+      const sent = data && data.length ? await run() : null;
+      return json(req, { queued: !!(data && data.length), key, sent });
     }
 
     if (!action) {
