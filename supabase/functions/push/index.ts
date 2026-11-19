@@ -127,8 +127,9 @@ async function run() {
   const out: Record<string, number> = { sent: 0, gone: 0, failed: 0, skipped: 0 };
   for (const m of msgs || []) {
     for (const s of (subs || []) as Sub[]) {
-      const day = localDay(s.tz);
-      // Claim the (phone, notification, day) row first; only a new row gets sent.
+      // The day the notification was queued, in the phone's time zone: a row queued in the evening must not
+      // count as new again after midnight. Claim the (phone, notification, day) row first; only a new row gets sent.
+      const day = localDay(s.tz, new Date(m.created_at));
       const { data: claimed } = await db.from("push_sent")
         .upsert({ endpoint: s.endpoint, key: m.key, day }, { onConflict: "endpoint,key,day", ignoreDuplicates: true })
         .select();
