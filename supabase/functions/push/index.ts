@@ -5,7 +5,8 @@
 //   POST ?action=unsubscribe  { endpoint }
 //   POST ?action=test         { endpoint } -> sends a test notification to that phone (approved phones only)
 //   POST ?action=enqueue      header x-enqueue-token, { key, title, body, url? } -> adds a row to push_outbox (used by the Mac mini)
-//   POST (no action)          header x-cron-secret: sends due rows from push_outbox (run by pg_cron)
+//   POST ?action=beat         header x-enqueue-token, { name, at? } -> a routine says it finished (the watchdog reads these)
+//   POST (no action)          header x-cron-secret: checks the heartbeats, then sends due rows from push_outbox (run by pg_cron)
 // New phones start unapproved, so nobody who finds the page can read Isak's notifications.
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
@@ -18,6 +19,14 @@ const APP_URL = "https://claude.ai/artifact/JCcrHbJtuJMPXvsqPoTBSy";
 const ORIGINS = ["https://isakekelund.github.io", "http://localhost:8790"];
 const PUSH_HOSTS = [/\.push\.apple\.com$/, /^fcm\.googleapis\.com$/, /\.push\.services\.mozilla\.com$/, /\.notify\.windows\.com$/];
 const MAX_AGE_H = 18; // outbox rows older than this are not sent
+// Watchdog: each routine reports a heartbeat (?action=beat) when it finishes. If one goes quiet for longer
+// than maxH, during its active hours (Stockholm), the phones get one notification per outage.
+const WATCH: Record<string, { label: string; maxH: number; from?: number; to?: number }> = {
+  morning: { label: "The morning brief", maxH: 26 },
+  sync: { label: "Cadence sync", maxH: 3, from: 8, to: 23 },
+  ranking: { label: "Cadence ranking", maxH: 4, from: 6, to: 23 },
+  news: { label: "News", maxH: 7 * 24 + 14 }, // its beat carries the edition's own time
+};
 
 function cors(req: Request) {
   const o = req.headers.get("origin") || "";
@@ -83,7 +92,32 @@ async function send(keys: { public_key: string; private_key: string }, sub: Sub,
   }
 }
 
+function stockholm(d: Date, opts: Intl.DateTimeFormatOptions) {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Stockholm", hourCycle: "h23", ...opts }).format(d);
+}
+
+async function watchdog() {
+  const { data: beats } = await db.from("push_beats").select("*");
+  const now = new Date(), hour = Number(stockholm(now, { hour: "2-digit" }));
+  for (const b of beats || []) {
+    const w = WATCH[b.name];
+    if (!w) continue;
+    if (w.from != null && (hour < w.from || hour >= (w.to ?? 24))) continue;
+    const last = new Date(b.last_at);
+    if (now.getTime() - last.getTime() < w.maxH * 3600e3) continue;
+    const when = stockholm(last, { weekday: "short", hour: "2-digit", minute: "2-digit" });
+    // One row per outage: the key names the last good run, so a fixed routine re-arms the alert.
+    await db.from("push_outbox").upsert({
+      key: `down:${b.name}:${last.toISOString()}`,
+      title: `${w.label} has stopped`,
+      body: `Last ran ${when}. Open Claude's routines to see what went wrong.`,
+      url: "https://claude.ai/code",
+    }, { onConflict: "key", ignoreDuplicates: true });
+  }
+}
+
 async function run() {
+  await watchdog().catch((e) => console.error("watchdog", e));
   const keys = await getKeys();
   const since = new Date(Date.now() - MAX_AGE_H * 3600e3).toISOString();
   const { data: msgs } = await db.from("push_outbox").select("*")
@@ -171,6 +205,18 @@ Deno.serve(async (req) => {
       // Send right away instead of waiting for the next cron run; push_sent still stops doubles.
       const sent = data && data.length ? await run() : null;
       return json(req, { queued: !!(data && data.length), key, sent });
+    }
+
+    if (action === "beat") {
+      const k = await getKeys();
+      if (!k.enqueue_token || req.headers.get("x-enqueue-token") !== k.enqueue_token) return json(req, { error: "forbidden" }, 403);
+      const name = typeof body.name === "string" ? body.name : "";
+      if (!WATCH[name]) return json(req, { error: "unknown name" }, 400);
+      const now = Date.now(), at = typeof body.at === "string" ? Date.parse(body.at) : now;
+      if (!Number.isFinite(at) || at > now + 60e3) return json(req, { error: "bad at" }, 400);
+      const { error } = await db.from("push_beats").upsert({ name, last_at: new Date(at).toISOString(), updated_at: new Date(now).toISOString() });
+      if (error) throw error;
+      return json(req, { ok: true, name, at: new Date(at).toISOString() });
     }
 
     if (!action) {

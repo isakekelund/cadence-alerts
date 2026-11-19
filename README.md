@@ -27,3 +27,7 @@ update public.push_subscriptions set approved = true where code = 'A1B2C3';
 ```
 
 No secrets live in this repo: the VAPID private key and the cron secret are in `public.push_keys`, readable only by the service role.
+
+## Watchdog
+
+Each routine reports in when it finishes: `python3 ~/.cadence-alerts/notify.py --beat <morning|sync|ranking|news>`. If one goes quiet for longer than its limit (see `WATCH` in the function), every approved device gets one notification for that outage. The heartbeats live in `push_beats`.
