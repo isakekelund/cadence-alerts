@@ -63,6 +63,11 @@ footer a{color:var(--soft)}
   <footer>Tapping a notification opens <a href="https://claude.ai/artifact/JCcrHbJtuJMPXvsqPoTBSy">Cadence</a>.</footer>
 </main>
 <script>
+// A tapped notification opens Alerts with ?open=<address> (sw.js); go on to that part of Cadence.
+(function(){
+  const to = new URLSearchParams(location.search).get('open');
+  if (to && /^https:\/\/claude\.ai\//.test(to)) { history.replaceState(null, '', location.pathname); location.replace(to); }
+})();
 (function(){
   const FN = 'https://bttliinpthrngngohbcv.supabase.co/functions/v1/push';
   const card = document.getElementById('card');

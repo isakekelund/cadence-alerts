@@ -37,3 +37,8 @@ Each routine reports in when it finishes: `python3 ~/.cadence-alerts/notify.py -
 `apps/` holds one launcher per Cadence app (built by `tools/make_launchers.py` from the icons in the Cadence repo). Open https://isakekelund.github.io/cadence-alerts/apps/ in Safari on the iPhone, tap an app, and add it to the Home Screen. A launcher opens its part of Cadence on claude.ai, so changes to the artifact show up without touching these pages.
 
 `apps/cadence-apps.mobileconfig` (built by `tools/make_profile.py`) is a configuration profile with the same ten apps as full-screen web clips: own icon, no Safari bars. `apps/cadence-test.mobileconfig` holds Habits only, to try it first.
+
+## Tapping a notification
+
+- iPhone: Alerts opens itself with `?open=<address>` and goes on to that part of Cadence (a Home Screen app cannot open another one).
+- Mac: Alerts runs in Chrome. A tap asks `mac/opener.py` (on 127.0.0.1:8799, started at login by the LaunchAgent in `mac/`) to bring up the matching Dock app in `~/Applications`. If the helper is not running, the tap opens a normal Chrome tab. Safari blocks the call to the helper, which is why the Mac uses Chrome.
