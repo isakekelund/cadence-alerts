@@ -1,11 +1,15 @@
 // Cadence Alerts service worker: shows pushed notifications and opens the right part of Cadence when one is tapped.
-const VERSION = '5';
+const VERSION = '6';
 const APP_URL = 'https://claude.ai/artifact/JCcrHbJtuJMPXvsqPoTBSy';
 // On the Mac mini a small helper (~/.cadence-alerts/opener.py) listens here and brings up the matching Dock app.
 const MAC_OPENER = 'http://127.0.0.1:8799/open?url=';
 
 self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+self.addEventListener('activate', (e) => e.waitUntil((async () => {
+  // Leave the version where the page can read it, for the footer's diagnostic line.
+  await (await caches.open('alerts')).put('sw-version', new Response(VERSION));
+  await self.clients.claim();
+})()));
 
 self.addEventListener('push', (e) => {
   let m = {};

@@ -86,7 +86,11 @@ footer a{color:var(--soft)}
     const el = document.getElementById('diag'); if (!el) return;
     let tap = '';
     try { const r = await (await caches.open('alerts')).match('last-tap'); if (r) { const t = await r.json(); tap = ' · last tap ' + new Date(t.at).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) + ' (v' + t.v + ')'; } } catch (e) {}
-    el.textContent = 'Page v5 · worker ' + (window.__swv ? 'v' + window.__swv : 'unknown') + tap;
+    let stamped = '';
+    try { const r = await (await caches.open('alerts')).match('sw-version'); if (r) stamped = await r.text(); } catch (e) {}
+    const reg0 = navigator.serviceWorker && await navigator.serviceWorker.getRegistration().catch(() => null);
+    const waiting = reg0 && reg0.waiting ? ' (a newer one is waiting)' : '';
+    el.textContent = 'Page v6 · worker ' + (window.__swv || stamped ? 'v' + (window.__swv || stamped) : 'old (before v5)') + waiting + tap;
   }
   if (navigator.serviceWorker) {
     navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.version) { window.__swv = e.data.version; diag(); } });
