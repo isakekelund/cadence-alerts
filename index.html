@@ -65,8 +65,22 @@ footer a{color:var(--soft)}
 <script>
 // A tapped notification opens Alerts with ?open=<address> (sw.js); go on to that part of Cadence.
 (function(){
-  const to = new URLSearchParams(location.search).get('open');
-  if (to && /^https:\/\/claude\.ai\//.test(to)) { history.replaceState(null, '', location.pathname); location.replace(to); }
+  const ok = (u) => typeof u === 'string' && /^https:\/\/claude\.ai\//.test(u);
+  const go = (u) => { if (ok(u)) { history.replaceState(null, '', location.pathname); location.href = u; return true; } return false; };
+  if (go(new URLSearchParams(location.search).get('open'))) return;
+  if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', (e) => { if (e.data) go(e.data.open); });
+  // The address sw.js left when a notification was tapped, if it is less than two minutes old.
+  async function pending(){
+    try {
+      const c = await caches.open('alerts'), r = await c.match('pending-open');
+      if (!r) return;
+      const p = await r.json(); await c.delete('pending-open');
+      if (Date.now() - p.at < 120000) go(p.url);
+    } catch (e) {}
+  }
+  pending();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pending(); });
+  window.addEventListener('pageshow', pending);
 })();
 (function(){
   const FN = 'https://bttliinpthrngngohbcv.supabase.co/functions/v1/push';

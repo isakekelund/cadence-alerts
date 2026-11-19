@@ -32,13 +32,14 @@ self.addEventListener('notificationclick', (e) => {
       } catch (err) { /* helper not running */ }
       return self.clients.openWindow(url);
     }
-    // iPhone: a Home Screen app cannot open another one, and it ignores addresses outside Alerts.
-    // So open Alerts itself with ?open=, and let the page go on to that part of Cadence.
-    const target = './?open=' + encodeURIComponent(url);
+    // iPhone: a Home Screen app cannot open another one, and iOS often just brings Alerts forward without
+    // following an address. So leave the address where the page looks for it (it checks whenever it is shown),
+    // tell any open page directly, and open Alerts.
+    const cache = await caches.open('alerts');
+    await cache.put('pending-open', new Response(JSON.stringify({ url, at: Date.now() })));
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    for (const w of wins) {
-      if ('navigate' in w) { try { await w.navigate(target); return w.focus(); } catch (err) { /* try the next */ } }
-    }
-    return self.clients.openWindow(target);
+    for (const w of wins) { try { w.postMessage({ open: url }); } catch (err) { /* ignore */ } }
+    if (wins.length) { try { return await wins[0].focus(); } catch (err) { /* fall through */ } }
+    return self.clients.openWindow('./?open=' + encodeURIComponent(url));
   })());
 });
