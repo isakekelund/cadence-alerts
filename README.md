@@ -31,3 +31,7 @@ No secrets live in this repo: the VAPID private key and the cron secret are in `
 ## Watchdog
 
 Each routine reports in when it finishes: `python3 ~/.cadence-alerts/notify.py --beat <morning|sync|ranking|news>`. If one goes quiet for longer than its limit (see `WATCH` in the function), every approved device gets one notification for that outage. The heartbeats live in `push_beats`.
+
+## Cadence apps on the Home Screen
+
+`apps/` holds one launcher per Cadence app (built by `tools/make_launchers.py` from the icons in the Cadence repo). Open https://isakekelund.github.io/cadence-alerts/apps/ in Safari on the iPhone, tap an app, and add it to the Home Screen. A launcher opens its part of Cadence on claude.ai, so changes to the artifact show up without touching these pages.
