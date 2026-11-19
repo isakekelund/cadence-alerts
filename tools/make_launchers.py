@@ -79,6 +79,11 @@ def index():
 <p>Put each part of Cadence on your Home Screen with its own icon, like the apps in the Mac Dock. Open this page in Safari on your iPhone, tap an app, then add it.</p>
 <div class="card">{rows}</div>
 <p>They open Cadence on claude.ai, so whatever Claude changes there shows up at once.</p>
+<h1 style="font-size:22px;margin-top:28px">Full screen, without Safari's bars</h1>
+<p>A profile adds the apps as full-screen web clips with the same icons. It holds only the ten names, addresses and icons.</p>
+<div class="card"><ol><li>Tap a link below and choose <b>Allow</b>.</li><li>Open <b>Settings</b>, tap <b>Profile Downloaded</b>, then <b>Install</b>. iPhone says the profile is not signed; that is expected for one you made yourself.</li><li>The first time you open each app, sign in to Claude in it.</li></ol>
+<p><a href="cadence-test.mobileconfig">Try one first: Habits</a><br><a href="cadence-apps.mobileconfig">All ten apps</a></p></div>
+<p>To remove them: Settings, General, VPN &amp; Device Management, the profile, Remove Profile.</p>
 </main></body></html>
 """
 
