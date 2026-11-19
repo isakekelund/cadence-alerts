@@ -27,7 +27,7 @@ self.addEventListener('notificationclick', (e) => {
     if (isMac && url.startsWith('https://claude.ai/artifact/')) {
       // Ask the helper to open the Dock app; if it is not running, fall back to a browser tab.
       try {
-        const r = await fetch(MAC_OPENER + encodeURIComponent(url), { mode: 'no-cors', cache: 'no-store' });
+        const r = await fetch(MAC_OPENER + encodeURIComponent(url), { mode: 'no-cors', cache: 'no-store', targetAddressSpace: 'loopback' });
         if (r) return;
       } catch (err) { /* helper not running */ }
       return self.clients.openWindow(url);

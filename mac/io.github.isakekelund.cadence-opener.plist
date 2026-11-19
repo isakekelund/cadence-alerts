@@ -5,4 +5,6 @@
   <key>ProgramArguments</key><array><string>/usr/bin/python3</string><string>/Users/isakekelund/.cadence-alerts/opener.py</string></array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/Users/isakekelund/.cadence-alerts/opener.log</string>
+  <key>StandardErrorPath</key><string>/Users/isakekelund/.cadence-alerts/opener.log</string>
 </dict></plist>

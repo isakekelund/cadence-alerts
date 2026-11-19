@@ -95,14 +95,28 @@ footer a{color:var(--soft)}
       denied: ['bad', 'Blocked', 'Notifications are turned off for Alerts', isIOS ? '<p>Open Settings → Notifications → Alerts and turn on Allow Notifications. Then come back here.</p>' : '<p>Allow notifications for this site in the browser’s site settings, then reload the page.</p>'],
       off: ['', 'Off', 'Get Cadence on your lock screen', '<p>A short note when your morning brief is ready and when the week’s news is out. Your phone’s Focus and Sleep settings still decide when you see them.</p>' + '<div class="btns">' + btn('on', 'Turn on notifications', true) + '</div>'],
       pending: ['wait', 'Waiting for approval', 'Approve this phone', `<p>New phones get nothing until you approve them. Ask Claude: “Approve Cadence Alerts device ${view.code}”.</p><div class="code">${view.code}</div><div class="btns">${btn('check', 'Check again', true)}${btn('off', 'Turn off')}</div>`],
-      on: ['on', 'On', 'Notifications are on', '<p>You will hear from Cadence when the morning brief is ready and when the week’s news is out.</p><div class="btns">' + btn('test', 'Send a test notification', true) + btn('off', 'Turn off') + '</div>'],
+      on: ['on', 'On', 'Notifications are on', '<p>You will hear from Cadence when the morning brief is ready, when the week’s news is out, and when something needs you.</p><div class="btns">' + btn('test', 'Send a test notification', true) + btn('off', 'Turn off') + '</div>'
+        + (macChrome ? '<p>On this Mac a tapped notification can open its Dock app (News, Habits, ...) instead of a new tab. Chrome asks once whether Alerts may reach the helper on this Mac: choose Allow.</p><div class="btns">' + btn('dock', 'Open notifications in Dock apps') + '</div>' : '')],
       error: ['bad', 'Can’t reach Cadence', 'Something went wrong', '<p>The notification server did not answer. Check the connection and try again.</p><div class="btns">' + btn('retry', 'Try again', true) + '</div>'],
     }[view.name];
     card.innerHTML = `<div class="state ${v[0]}"><i></i>${v[1]}</div><h2>${v[2]}</h2>${v[3]}<div class="note${noteErr ? ' err' : ''}">${note}</div>`;
     const on = (id, fn) => { const b = document.getElementById(id); if (b) b.onclick = fn; };
-    on('on', turnOn); on('off', turnOff); on('test', sendTest); on('check', refresh); on('retry', refresh);
+    on('on', turnOn); on('off', turnOff); on('test', sendTest); on('check', refresh); on('retry', refresh); on('dock', linkDock);
   }
   function say(msg, err){ note = msg; noteErr = !!err; }
+
+  // Mac in Chrome: sw.js asks the helper on 127.0.0.1 to open the Dock app. Chrome only lets it once this page
+  // has asked (and been allowed) to reach the local network, so this button asks.
+  const macChrome = !isIOS && /Macintosh/.test(ua) && /Chrome\//.test(ua);
+  async function linkDock(){
+    try {
+      await fetch('http://127.0.0.1:8799/ping', {cache: 'no-store', targetAddressSpace: 'loopback'});
+      say('Done. A tapped notification now opens its Dock app.');
+    } catch (e) {
+      say('Chrome could not reach the helper on this Mac. If you chose Block, allow Local network access for this site in Chrome’s site settings, then try again.', true);
+    }
+    render({name: 'on'});
+  }
 
   async function subscribe(key){
     const sub = await reg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: b64(key)});
