@@ -75,6 +75,15 @@ type Sub = { endpoint: string; p256dh: string; auth: string; tz: string; vapid_k
 
 async function send(keys: { public_key: string; private_key: string }, sub: Sub, msg: Record<string, unknown>) {
   try {
+    // iPhone: tapping only brings Alerts forward and the service worker's click handler is not reliable there.
+    // Apple's declarative form lets iOS itself open an address on tap: Alerts with ?open=, which goes on to
+    // that part of Cadence. Other browsers ignore the extra fields and use title, body and url as before.
+    if (/\.push\.apple\.com$/.test(new URL(sub.endpoint).hostname)) {
+      msg = { ...msg, web_push: 8030, notification: {
+        title: msg.title, body: msg.body, tag: msg.tag,
+        navigate: `${SUBJECT}?open=${encodeURIComponent(String(msg.url || APP_URL))}`,
+      } };
+    }
     await webpush.sendNotification(
       { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
       JSON.stringify(msg),
