@@ -60,7 +60,7 @@ footer a{color:var(--soft)}
     <div><h1>Cadence Alerts</h1><p>Notifications from Cadence on this phone.</p></div>
   </header>
   <section class="card" id="card" aria-live="polite"><p>Checking this device…</p></section>
-  <footer>Tapping a notification opens <a href="https://claude.ai/artifact/JCcrHbJtuJMPXvsqPoTBSy">Cadence</a>.</footer>
+  <footer>Tapping a notification opens that part of <a href="https://claude.ai/artifact/JCcrHbJtuJMPXvsqPoTBSy">Cadence</a>.<br><small id="diag"></small></footer>
 </main>
 <script>
 // A tapped notification opens Alerts with ?open=<address> (sw.js); go on to that part of Cadence.
@@ -70,17 +70,33 @@ footer a{color:var(--soft)}
   if (go(new URLSearchParams(location.search).get('open'))) return;
   if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', (e) => { if (e.data) go(e.data.open); });
   // The address sw.js left when a notification was tapped, if it is less than two minutes old.
+  // Only once the page is on screen: iOS ignores a navigation started while the app is still in the background.
   async function pending(){
+    if (document.visibilityState !== 'visible') return;
     try {
       const c = await caches.open('alerts'), r = await c.match('pending-open');
       if (!r) return;
-      const p = await r.json(); await c.delete('pending-open');
-      if (Date.now() - p.at < 120000) go(p.url);
+      const p = await r.json();
+      if (Date.now() - p.at > 120000) return void c.delete('pending-open');
+      setTimeout(async () => { await c.delete('pending-open'); go(p.url); }, 250);
     } catch (e) {}
   }
+  // A small line in the footer: which service worker version runs, and when a notification was last tapped.
+  async function diag(){
+    const el = document.getElementById('diag'); if (!el) return;
+    let tap = '';
+    try { const r = await (await caches.open('alerts')).match('last-tap'); if (r) { const t = await r.json(); tap = ' · last tap ' + new Date(t.at).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) + ' (v' + t.v + ')'; } } catch (e) {}
+    el.textContent = 'Page v5 · worker ' + (window.__swv ? 'v' + window.__swv : 'unknown') + tap;
+  }
+  if (navigator.serviceWorker) {
+    navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.version) { window.__swv = e.data.version; diag(); } });
+    navigator.serviceWorker.ready.then((r) => { if (r.active) r.active.postMessage({ ask: 'version' }); });
+  }
+  document.addEventListener('DOMContentLoaded', diag);
   pending();
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pending(); });
+  document.addEventListener('visibilitychange', pending);
   window.addEventListener('pageshow', pending);
+  window.addEventListener('focus', pending);
 })();
 (function(){
   const FN = 'https://bttliinpthrngngohbcv.supabase.co/functions/v1/push';
@@ -145,6 +161,7 @@ footer a{color:var(--soft)}
     if (Notification.permission === 'denied') return render({name: 'denied'});
     try {
       reg = reg || await navigator.serviceWorker.register('sw.js', {scope: './'});
+      reg.update().catch(() => {}); // pick up a new sw.js at once
       await navigator.serviceWorker.ready;
       let sub = await reg.pushManager.getSubscription();
       if (!sub || Notification.permission !== 'granted') return render({name: 'off'});

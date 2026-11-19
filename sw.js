@@ -1,4 +1,5 @@
 // Cadence Alerts service worker: shows pushed notifications and opens the right part of Cadence when one is tapped.
+const VERSION = '5';
 const APP_URL = 'https://claude.ai/artifact/JCcrHbJtuJMPXvsqPoTBSy';
 // On the Mac mini a small helper (~/.cadence-alerts/opener.py) listens here and brings up the matching Dock app.
 const MAC_OPENER = 'http://127.0.0.1:8799/open?url=';
@@ -20,6 +21,11 @@ self.addEventListener('push', (e) => {
 
 const isMac = /Macintosh/.test(self.navigator.userAgent) && !(self.navigator.maxTouchPoints > 1);
 
+// The page asks which version is running, to show it in its footer.
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.ask === 'version' && e.source) e.source.postMessage({ version: VERSION });
+});
+
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
   const url = (e.notification.data && e.notification.data.url) || APP_URL;
@@ -37,6 +43,7 @@ self.addEventListener('notificationclick', (e) => {
     // tell any open page directly, and open Alerts.
     const cache = await caches.open('alerts');
     await cache.put('pending-open', new Response(JSON.stringify({ url, at: Date.now() })));
+    await cache.put('last-tap', new Response(JSON.stringify({ url, at: Date.now(), v: VERSION })));
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const w of wins) { try { w.postMessage({ open: url }); } catch (err) { /* ignore */ } }
     if (wins.length) { try { return await wins[0].focus(); } catch (err) { /* fall through */ } }
