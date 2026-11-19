@@ -1,5 +1,6 @@
 // Cadence Alerts: Web Push for Cadence, sent from Supabase.
 //   GET  ?action=key          -> { publicKey }   (creates the VAPID key pair the first time)
+//   GET  ?action=profile&name=test|apps -> the Home Screen profile from apps/, with the type iPhone needs
 //   POST ?action=subscribe    { subscription, tz, vapidKey, device } -> { code, approved }
 //   POST ?action=status       { endpoint } -> { known, approved, code, keyOk }
 //   POST ?action=unsubscribe  { endpoint }
@@ -147,6 +148,13 @@ Deno.serve(async (req) => {
     if (action === "key") {
       const k = await getKeys();
       return json(req, { publicKey: k.public_key });
+    }
+    if (action === "profile") {
+      // GitHub Pages serves a .mobileconfig as a plain download; iPhone only offers to install it with this type.
+      const name = new URL(req.url).searchParams.get("name") === "apps" ? "cadence-apps" : "cadence-test";
+      const r = await fetch(`${SUBJECT}apps/${name}.mobileconfig`);
+      if (!r.ok) return json(req, { error: "not found" }, 502);
+      return new Response(await r.arrayBuffer(), { headers: { "Content-Type": "application/x-apple-aspen-config", "Cache-Control": "no-store" } });
     }
     if (req.method !== "POST") return json(req, { error: "method" }, 405);
     const body = action ? await req.json().catch(() => ({})) : {};
